@@ -1,0 +1,135 @@
+
+---
+title: "Heart Disease Prediction"
+author: "Anna Wallin"
+date: "Jan 2021"
+output:
+  pdf_document: default
+  html_notebook: default
+  word_document: default
+---
+
+```{r install, message = FALSE}
+
+library(readr)
+```
+
+```{r}
+mydata<-read_csv("HeartDiseaseOG.csv") #load in data
+#binary response variable is TenYearCHD
+#Predictor variables are: male, age, education, currentSmoker,cigsPerDay,BPMeds, prevalentStroke,prevalentHyp,diabetes, totChol, sysBP, diaBP, BMI, heartRate, glucose
+#education has a value of 1 to 4 depending on if the respondent did some high school, high school or GED, some college or vocational school, or college
+
+summary(mydata) #summary statistics of the data set
+sapply(mydata,sd) #view standard deviations
+```
+
+```{r logit}
+mydata$education<-factor(mydata$education) #make education categorical var 
+
+#run logistic regression
+logit_model<-glm(TenYearCHD~male+age+education+currentSmoker+cigsPerDay+BPMeds+ prevalentStroke+prevalentHyp+diabetes+totChol+sysBP+diaBP+BMI+heartRate+glucose, data=mydata,family = binomial(link = "logit"))
+
+
+```
+
+```{r view}
+summary(logit_model)
+
+```
+# Variables that are statistically significant
+Variables that have a p-value below 0.05: male, age, cigsPerDay, totChol, sysBP, and glucose.
+
+The coefficients show the log odds for a one unit increase in the x (predictor) variable.
+
+For example, for a one unit increase in cigsPerDay, being categorized as at risk for coronary heart disease over a ten year period increases by 0.018387.
+
+
+```{r CI}
+#calc CIs
+confint(logit_model)
+
+```
+
+
+```{r CI default}
+
+confint.default(logit_model)
+
+```
+
+```{r odds ratio }
+exp(coef(logit_model))
+
+```
+```{r odds ratio table with CI}
+exp(cbind(Odds_Ratio=coef(logit_model),confint(logit_model))) # 95 % CI
+
+```
+You can exponentiate coefficients to find odds ratios. Here is the formula simplified...
+\begin{displaymath}\frac{exp(\alpha+ \beta(x_i + 1))}{exp(\alpha+\beta x_i)}\end{displaymath}
+
+The above becomes...
+\begin{displaymath}=\frac{exp(\alpha+\beta x_i +\beta)}{exp(\alpha+\beta x_i)}\end{displaymath}
+
+which further simplifies to...\
+\begin{displaymath}=\frac{exp(\alpha+\beta x_i)*exp(\beta)}{exp(\alpha+\beta x_i)}\end{displaymath}
+
+Finally...\
+\begin{displaymath}=exp(\beta)\end{displaymath}
+
+```{r exp}
+
+exp(0.002377) #totChol odds ratio exponentiated beta
+#a one unit increase in total cholesterol increases odds of CHD risk over a ten year period by 0.2377%
+```
+
+Being male increases the odds of being at risk for coronary heart disease by a factor of 1.7430891161.
+
+A one unit increase in total cholesterol increases odds of CHD risk over a ten year period by 0.2377%
+
+
+### Let's look at variable importance...
+
+```{r var import}
+#library(caret)
+#update.packages()
+#install.packages("caret",
+                 #repos = "http://cran.r-project.org", 
+                 #dependencies = c("Depends", "Imports", "Suggests"))
+caret::varImp(logit_model)
+
+```
+The most important predictor of CHD is age, followed by the sex of a person.
+
+
+### Now, let's examine multicollinearity
+```{r mc}
+#install.packages("car")
+
+library(car)
+car::vif(logit_model)
+```
+Looking at the Variance Inflation Indicator, all values range from 1 to 3.6. This means that there is moderate correlation between a predictor variable and other variables. Given that there is not strong correlation, this does not need any action to correct.
+
+### Using our model to make predictions...
+
+```{r predicted probability}
+
+mydata_NA=na.omit(mydata)
+#mean(mydata_NA$age)
+#mean(mydata_NA$cigsPerDay)
+#mean(mydata_NA$totChol)
+#mean(mydata_NA$sysBP)
+#mean(mydata_NA$glucose)
+for_pred<- data.frame(age=mean(mydata_NA$age), cigsPerDay=mean(mydata_NA$cigsPerDay),totChol=mean(mydata_NA$totChol), sysBP=mean(mydata_NA$sysBP),male=1,education=factor(1), currentSmoker=1,glucose=101, BPMeds=0,prevalentHyp=0,prevalentStroke=0,diabetes=0,heartRate=0,BMI=0,diaBP=0)
+predict(logit_model,for_pred,type="response")
+
+# given average age, cigarette consumption, cholesterol, systolic blood pressure, a smoking man with above average glucose has a .24 chance of developing risk of CHD
+
+
+```
+these were sig: male, age, cigsPerDay, totChol, sysBP, and glucose
+
+
+
